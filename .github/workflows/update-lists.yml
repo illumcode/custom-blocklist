@@ -1,0 +1,40 @@
+name: Update bypass lists
+
+on:
+  schedule:
+    # каждый день в 04:17 UTC (не в 00:00, чтобы не толкаться в общий пик крон-джобов)
+    - cron: "17 4 * * *"
+  workflow_dispatch: {}   # кнопка "Run workflow" в интерфейсе GitHub
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run generator
+        run: python3 update_lists.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Нет изменений."
+            exit 0
+          fi
+          git add 'lists/*.lst'
+          git commit -m "auto: обновление ip-листов ($(date -u +%Y-%m-%d))"
+          git push
