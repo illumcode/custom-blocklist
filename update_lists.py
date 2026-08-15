@@ -185,13 +185,25 @@ def fetch_cloudfront() -> list[ipaddress.IPv4Network]:
 def fetch_telegram_official() -> list[ipaddress.IPv4Network]:
     r = requests.get("https://core.telegram.org/resources/cidr.txt", timeout=HTTP_TIMEOUT, headers={"User-Agent": UA})
     r.raise_for_status()
-    return [ipaddress.ip_network(l.strip(), strict=False) for l in r.text.splitlines() if l.strip()]
+    nets = []
+    for l in r.text.splitlines():
+        l = l.strip()
+        if not l:
+            continue
+        try:
+            net = ipaddress.ip_network(l, strict=False)
+        except ValueError:
+            continue
+        if isinstance(net, ipaddress.IPv4Network):  # файл содержит и IPv6 — нам нужен только v4
+            nets.append(net)
+    return nets
 
 
 # ─────────────────────────── общая нормализация ───────────────────────────
 
 def finalize(nets: list[ipaddress.IPv4Network]) -> list[str]:
     """Дедуп + схлопывание смежных сетей + вырезание DNS-резолверов + сортировка."""
+    nets = [n for n in nets if isinstance(n, ipaddress.IPv4Network)]  # на случай, если источник подсунет IPv6
     uniq = list({n for n in nets})
     collapsed = list(ipaddress.collapse_addresses(uniq)) if uniq else []
     out = []
@@ -346,9 +358,11 @@ def build_service(name: str, svc: Service) -> list[ipaddress.IPv4Network]:
                     l = l.strip()
                     if l:
                         try:
-                            nets.append(ipaddress.ip_network(l, strict=False))
+                            net = ipaddress.ip_network(l, strict=False)
                         except ValueError:
-                            pass
+                            continue
+                        if isinstance(net, ipaddress.IPv4Network):
+                            nets.append(net)
         else:
             log.warning("  неизвестный тип источника: %s", src.kind)
     return nets
