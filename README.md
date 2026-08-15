@@ -6,6 +6,6 @@
 - https://github.com/touhidurrr/iplist-youtube
 - https://github.com/xyzmean/ru-bypass-ipsets
 
-огромное спасибр что делаете это
+ОГРОМНОЕ СПАСИБО ЧТО СДЕЛАЛИ И ДЕЛАЕТЕ ЭТО
 
 т.к это кастомная сборка многих сервисов не будет но по идеи всё должно работать
