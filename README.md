@@ -16,7 +16,7 @@ requirements.txt
 ```
 
 Поддерживаемые сервисы: Telegram, YouTube, Gemini, Claude, DeepL, Discord,
-SoundCloud, Steam (Valve), Cloudflare CDN, CloudFront CDN. TikTok в списке
+SoundCloud, GitHub, Steam (Valve), Cloudflare CDN, CloudFront CDN. TikTok в списке
 есть, но не обновляется автоматически: надёжного источника под него пока не
 нашёл, IP-подсети там правятся руками.
 
@@ -35,6 +35,7 @@ policy-routing на OpenWrt, которая ест такой формат).
 | **resolve** | резолвит домены из `*_domains.lst` через 4 публичных DNS параллельно, берёт /24 вокруг каждого ответа |
 | **asn** | тянет все анонсируемые подсети ASN-провайдера (RIPEstat, потом ip.guide, потом bgpview, первый живой источник побеждает) |
 | **cloudflare / cloudfront** | официальные фиды этих CDN |
+| **github_meta** | официальный список IP GitHub (`api.github.com/meta`), берёт все категории сразу (web, api, git, actions, pages и т.д.) |
 | **official_url** | готовый список от самого сервиса, например Telegram публикует свой `cidr.txt` |
 
 Результат схлопывается, дедуплицируется, и из него вырезаются адреса самих

@@ -182,6 +182,30 @@ def fetch_cloudfront() -> list[ipaddress.IPv4Network]:
             for e in data.get("prefixes", []) if e.get("service") == "CLOUDFRONT"]
 
 
+def fetch_github_meta() -> list[ipaddress.IPv4Network]:
+    """Официальный список IP GitHub: https://api.github.com/meta
+    Берём все категории (web, api, git, packages, pages, actions, importer, hooks, ...) —
+    GitHub добавляет новые ключи со временем, поэтому не завязываемся на конкретный список."""
+    r = requests.get("https://api.github.com/meta", timeout=HTTP_TIMEOUT,
+                      headers={"User-Agent": UA, "Accept": "application/vnd.github+json"})
+    r.raise_for_status()
+    data = r.json()
+    nets = []
+    for key, value in data.items():
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if not isinstance(item, str):
+                continue
+            try:
+                net = ipaddress.ip_network(item, strict=False)
+            except ValueError:
+                continue
+            if isinstance(net, ipaddress.IPv4Network):
+                nets.append(net)
+    return nets
+
+
 def fetch_telegram_official() -> list[ipaddress.IPv4Network]:
     r = requests.get("https://core.telegram.org/resources/cidr.txt", timeout=HTTP_TIMEOUT, headers={"User-Agent": UA})
     r.raise_for_status()
@@ -315,6 +339,11 @@ SERVICES: dict[str, Service] = {
         ip_file="steam_ip.lst",
         sources=[Source("asn", asn=32590)],  # Valve Corporation
     ),
+    "github": Service(
+        ip_file="github_ip.lst",
+        domains_file="github_domains.lst",
+        sources=[Source("resolve"), Source("github_meta")],
+    ),
     "cloudflare": Service(
         ip_file="cloudflare_ip.lst",
         sources=[Source("cloudflare")],
@@ -348,6 +377,8 @@ def build_service(name: str, svc: Service) -> list[ipaddress.IPv4Network]:
             nets += fetch_cloudflare()
         elif src.kind == "cloudfront":
             nets += fetch_cloudfront()
+        elif src.kind == "github_meta":
+            nets += fetch_github_meta()
         elif src.kind == "official_url":
             if "telegram.org" in src.url:
                 nets += fetch_telegram_official()
