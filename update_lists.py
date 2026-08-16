@@ -287,9 +287,10 @@ def diff_report(name: str, old: list[str], new: list[str]) -> None:
 
 @dataclass
 class Source:
-    kind: str                # "resolve" | "asn" | "cloudflare" | "cloudfront" | "official_url"
+    kind: str                # "resolve" | "asn" | "cloudflare" | "cloudfront" | "official_url" | "github_meta" | "extra_cidrs"
     asn: int | None = None
     url: str | None = None
+    cidrs: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -313,7 +314,28 @@ SERVICES: dict[str, Service] = {
     "gemini": Service(
         ip_file="gemini_ip_fix.lst",
         domains_file="gemini_domains.lst",
-        sources=[Source("resolve")],
+        sources=[
+            Source("resolve"),
+            # Основные блоки Google (AS15169). Нужны отдельно от resolve, потому что
+            # некоторые бэкенды (например waa-pa.clients6.google.com — anti-abuse/
+            # attestation токен, критичен для гео-проверки Gemini) — анкаст и на
+            # каждый запрос могут отвечать с разных из этих блоков. Один снимок DNS
+            # никогда не поймает их все, поэтому блоки закреплены явно.
+            Source("extra_cidrs", cidrs=[
+                "64.233.160.0/19",
+                "66.102.0.0/20",
+                "66.249.64.0/19",
+                "72.14.192.0/18",
+                "74.125.0.0/16",
+                "108.177.8.0/21",
+                "142.250.0.0/15",
+                "172.217.0.0/16",
+                "172.253.0.0/16",
+                "173.194.0.0/16",
+                "209.85.128.0/17",
+                "216.58.192.0/19",
+            ]),
+        ],
     ),
     "claude": Service(
         ip_file="claude_ip.lst",
@@ -379,6 +401,12 @@ def build_service(name: str, svc: Service) -> list[ipaddress.IPv4Network]:
             nets += fetch_cloudfront()
         elif src.kind == "github_meta":
             nets += fetch_github_meta()
+        elif src.kind == "extra_cidrs":
+            for c in src.cidrs:
+                try:
+                    nets.append(ipaddress.ip_network(c, strict=False))
+                except ValueError:
+                    log.warning("  битый CIDR в extra_cidrs: %s", c)
         elif src.kind == "official_url":
             if "telegram.org" in src.url:
                 nets += fetch_telegram_official()
