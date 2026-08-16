@@ -189,6 +189,27 @@ def fetch_cloudfront() -> list[ipaddress.IPv4Network]:
             for e in data.get("prefixes", []) if e.get("service") == "CLOUDFRONT"]
 
 
+def fetch_google_ranges() -> list[ipaddress.IPv4Network]:
+    """Официальный полный список сетей Google: https://www.gstatic.com/ipranges/goog.json
+    Нужен для YouTube — видео раздаётся с огромного числа edge-узлов по всему
+    миру, и один снимок DNS-резолва доменов физически не может поймать их все."""
+    r = requests.get("https://www.gstatic.com/ipranges/goog.json", timeout=HTTP_TIMEOUT, headers={"User-Agent": UA})
+    r.raise_for_status()
+    data = r.json()
+    nets = []
+    for entry in data.get("prefixes", []):
+        p = entry.get("ipv4Prefix")
+        if not p:
+            continue
+        try:
+            net = ipaddress.ip_network(p, strict=False)
+        except ValueError:
+            continue
+        if isinstance(net, ipaddress.IPv4Network):
+            nets.append(net)
+    return nets
+
+
 def fetch_github_meta() -> list[ipaddress.IPv4Network]:
     """Официальный список IP GitHub: https://api.github.com/meta
     Берём все категории (web, api, git, packages, pages, actions, importer, hooks, ...) —
@@ -280,7 +301,7 @@ def diff_report(name: str, old: list[str], new: list[str]) -> None:
 
 @dataclass
 class Source:
-    kind: str                # "resolve" | "asn" | "cloudflare" | "cloudfront" | "official_url" | "github_meta" | "extra_cidrs"
+    kind: str                # "resolve" | "asn" | "cloudflare" | "cloudfront" | "official_url" | "github_meta" | "google_full" | "extra_cidrs"
     asn: int | None = None
     url: str | None = None
     cidrs: list[str] = field(default_factory=list)
@@ -302,7 +323,7 @@ SERVICES: dict[str, Service] = {
     "youtube": Service(
         ip_file="youtube_ip.lst",
         domains_file="youtube_domains.lst",
-        sources=[Source("resolve")],
+        sources=[Source("resolve"), Source("google_full")],
     ),
     "gemini": Service(
         ip_file="gemini_ip_fix.lst",
@@ -748,6 +769,8 @@ def build_service(name: str, svc: Service) -> list[ipaddress.IPv4Network]:
             nets += fetch_cloudfront()
         elif src.kind == "github_meta":
             nets += fetch_github_meta()
+        elif src.kind == "google_full":
+            nets += fetch_google_ranges()
         elif src.kind == "extra_cidrs":
             for c in src.cidrs:
                 try:
